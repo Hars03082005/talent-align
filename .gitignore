@@ -53,3 +53,15 @@ data/application/*.db
 
 # Logs
 *.log
+
+# Environment secrets
+.env
+.env.*
+
+# Archives & large binary bundles
+*.zip
+data.zip
+
+# Frontend dependencies & build outputs
+frontend/node_modules/
+frontend/dist/

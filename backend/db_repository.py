@@ -444,6 +444,10 @@ def get_session_snapshots(db: Session, session_id: str) -> List[RecommendationSn
     )
 
 
+# Alias for compatibility with callers expecting get_recommendation_snapshots
+get_recommendation_snapshots = get_session_snapshots
+
+
 def get_user_assessment_history(db: Session, user_id: str, limit: int = 20) -> List[AssessmentSession]:
     """Retrieve all assessment sessions for a specific user ordered by start date."""
     return (
@@ -508,3 +512,166 @@ def get_feedback_by_session(db: Session, session_id: str) -> List[Feedback]:
 def get_feedback_by_user(db: Session, user_id: str) -> List[Feedback]:
     """Retrieve feedback submitted by a specific user."""
     return db.query(Feedback).filter(Feedback.user_id == user_id).order_by(desc(Feedback.created_at)).all()
+
+
+# ── Job Intelligence & Application Repository ──────────────────────────────────
+
+from backend.db_models import JobListing, JobApplication, JobCollectionRun
+
+
+def get_job_by_content_hash(db: Session, content_hash: str) -> Optional[JobListing]:
+    """Retrieve job by unique content hash for deduplication."""
+    return db.query(JobListing).filter(JobListing.content_hash == content_hash).first()
+
+
+def upsert_job_listing(db: Session, job_dict: Dict[str, Any]) -> Tuple[JobListing, bool]:
+    """
+    Upsert a job listing using content_hash deduplication.
+    Returns (job, created: bool).
+    """
+    chash = job_dict.get("content_hash")
+    existing = None
+    if chash:
+        existing = db.query(JobListing).filter(JobListing.content_hash == chash).first()
+
+    if existing:
+        # Update freshness
+        existing.last_verified_at = utc_now()
+        existing.is_active = 1
+        db.commit()
+        db.refresh(existing)
+        return existing, False
+
+    job = JobListing(
+        id=job_dict.get("id") or str(uuid.uuid4()),
+        external_id=job_dict.get("external_id") or job_dict.get("source_job_id"),
+        source_job_id=job_dict.get("source_job_id"),
+        content_hash=chash,
+        canonical_role_id=job_dict.get("canonical_role_id"),
+        title=job_dict.get("title", "Software Engineer"),
+        normalized_title=job_dict.get("normalized_title") or job_dict.get("title"),
+        company=job_dict.get("company", "Tech Enterprise"),
+        location=job_dict.get("location", "Bengaluru, India"),
+        location_type=(job_dict.get("work_mode", "remote")).lower(),
+        work_mode=job_dict.get("work_mode", "Remote"),
+        description=job_dict.get("description", ""),
+        required_skills=json.dumps(job_dict.get("required_skills") or []),
+        preferred_skills=json.dumps(job_dict.get("preferred_skills") or []),
+        experience_min=float(job_dict.get("experience_min") or 0.0),
+        experience_max=float(job_dict.get("experience_max") or 5.0),
+        experience_level=job_dict.get("experience_level", "Mid Level"),
+        salary_min=float(job_dict.get("salary_min")) if job_dict.get("salary_min") is not None else None,
+        salary_max=float(job_dict.get("salary_max")) if job_dict.get("salary_max") is not None else None,
+        currency=job_dict.get("currency", "INR"),
+        source=job_dict.get("source", "Greenhouse"),
+        source_url=job_dict.get("source_url") or job_dict.get("application_url", ""),
+        application_url=job_dict.get("application_url") or job_dict.get("source_url", ""),
+        posted_at=job_dict.get("posted_at") or utc_now(),
+        last_verified_at=utc_now(),
+        is_active=1,
+        created_at=utc_now(),
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return job, True
+
+
+def search_job_listings(
+    db: Session,
+    role_id: Optional[str] = None,
+    location: Optional[str] = None,
+    experience_level: Optional[str] = None,
+    work_mode: Optional[str] = None,
+    limit: int = 50,
+) -> List[JobListing]:
+    """Filter active job listings with optional multi-attribute filters."""
+    query = db.query(JobListing).filter(JobListing.is_active == 1)
+
+    if role_id and role_id != "all":
+        query = query.filter(JobListing.canonical_role_id == role_id)
+    if location and location.strip():
+        query = query.filter(JobListing.location.ilike(f"%{location.strip()}%"))
+    if experience_level and experience_level != "all" and experience_level != "Any":
+        query = query.filter(JobListing.experience_level.ilike(f"%{experience_level}%"))
+    if work_mode and work_mode != "all" and work_mode != "Any":
+        query = query.filter(JobListing.work_mode.ilike(f"%{work_mode}%"))
+
+    return query.order_by(desc(JobListing.posted_at)).limit(limit).all()
+
+
+def save_or_update_job_application(
+    db: Session,
+    user_id: str,
+    job_id: str,
+    status: str = "saved",
+) -> JobApplication:
+    """Save or update application tracking state."""
+    app = db.query(JobApplication).filter(
+        JobApplication.user_id == user_id,
+        JobApplication.job_id == job_id,
+    ).first()
+
+    if app:
+        app.status = status
+        app.updated_at = utc_now()
+    else:
+        app = JobApplication(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            job_id=job_id,
+            status=status,
+            updated_at=utc_now(),
+        )
+        db.add(app)
+
+    db.commit()
+    db.refresh(app)
+    return app
+
+
+def get_user_job_applications(db: Session, user_id: str) -> List[Dict[str, Any]]:
+    """Retrieve all tracked job applications with joined job details for a user."""
+    apps = (
+        db.query(JobApplication, JobListing)
+        .join(JobListing, JobApplication.job_id == JobListing.id)
+        .filter(JobApplication.user_id == user_id)
+        .order_by(desc(JobApplication.updated_at))
+        .all()
+    )
+    results = []
+    for app, job in apps:
+        item = job.to_detail_dict()
+        item["application_status"] = app.status
+        item["tracked_at"] = app.updated_at.isoformat() if app.updated_at else None
+        results.append(item)
+    return results
+
+
+def log_job_collection_run(
+    db: Session,
+    source: str,
+    jobs_fetched: int,
+    jobs_inserted: int,
+    status: str = "success",
+    error_message: Optional[str] = None,
+) -> JobCollectionRun:
+    """Record metadata for a job collection execution run."""
+    run = JobCollectionRun(
+        id=str(uuid.uuid4()),
+        source=source,
+        jobs_fetched=jobs_fetched,
+        jobs_inserted=jobs_inserted,
+        status=status,
+        error_message=error_message,
+        run_at=utc_now(),
+    )
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+    return run
+
+
+def get_latest_job_collection_runs(db: Session, limit: int = 10) -> List[JobCollectionRun]:
+    """Retrieve recent job collection run logs."""
+    return db.query(JobCollectionRun).order_by(desc(JobCollectionRun.run_at)).limit(limit).all()

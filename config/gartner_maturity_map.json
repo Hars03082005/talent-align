@@ -1,0 +1,399 @@
+{
+  "version": "1.0",
+  "description": "Gartner Hype Cycle Technology Maturity & Career Risk taxonomy for tech roles",
+  "stages": [
+    "Innovation Trigger",
+    "Peak of Inflated Expectations",
+    "Trough of Disillusionment",
+    "Slope of Enlightenment",
+    "Plateau of Productivity"
+  ],
+  "risk_profiles": [
+    "Early Frontier",
+    "High Hype / Volatile",
+    "Enterprise Scaling (Sweet Spot)",
+    "Mature / Stable"
+  ],
+  "families": {
+    "Artificial Intelligence & Machine Learning": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Enterprise AI is shifting from exploratory pilot projects to disciplined production systems and measurable business value."
+    },
+    "Cloud & Infrastructure": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Cloud native architectures, distributed infrastructure, and SRE form the indispensable utility backbone of modern IT."
+    },
+    "Data & Analytics": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Data engineering and analytics pipelines are core operational utilities powering organizational decision intelligence."
+    },
+    "Cybersecurity": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Zero-trust architecture, automated threat defense, and compliance regulations drive non-discretionary enterprise investment."
+    },
+    "Software & Web Engineering": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Standardized software development lifecycle and web frameworks deliver consistent, high-volume employment stability."
+    },
+    "Embedded & Frontier Systems": {
+      "hype_cycle_stage": "Innovation Trigger",
+      "years_to_plateau": "5–10 years",
+      "career_risk_profile": "Early Frontier",
+      "maturity_rationale": "Specialized hardware-software integration and next-generation compute paradigms navigating emerging industrial adoption."
+    },
+    "Architecture & Management": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Mature agile product governance and delivery frameworks ensure predictable enterprise execution and strategic alignment."
+    },
+    "default": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Technology domain experiencing steady enterprise adoption and practical workflow standardization."
+    }
+  },
+  "roles": {
+    "Generative AI Engineer": {
+      "hype_cycle_stage": "Peak of Inflated Expectations",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "High Hype / Volatile",
+      "maturity_rationale": "Intense market speculation is pivoting into rigorous cost, latency, and ROI accountability in enterprise deployments."
+    },
+    "AI Agent / Agentic AI Engineer": {
+      "hype_cycle_stage": "Innovation Trigger",
+      "years_to_plateau": "5–10 years",
+      "career_risk_profile": "Early Frontier",
+      "maturity_rationale": "Multi-agent orchestration and autonomous planning architectures represent an early frontier with massive long-term expansion."
+    },
+    "Prompt Engineer": {
+      "hype_cycle_stage": "Peak of Inflated Expectations",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "High Hype / Volatile",
+      "maturity_rationale": "Standalone prompting is rapidly commoditizing into broader software engineering, requiring transition toward full-stack AI skills."
+    },
+    "AI Security Engineer": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Adversarial LLM defense, guardrails, and compliance regulations make AI security a must-have enterprise capability."
+    },
+    "MLOps Engineer": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Continuous model integration, feature stores, and automated model governance are entering standard IT production suites."
+    },
+    "Machine Learning Engineer": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Established predictive modeling and deep learning architectures continue to scale across enterprise commerce and SaaS."
+    },
+    "Deep Learning Engineer": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Neural network optimization and fine-tuning are standardized requirements for computer vision, audio, and language services."
+    },
+    "NLP Engineer": {
+      "hype_cycle_stage": "Trough of Disillusionment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "High Hype / Volatile",
+      "maturity_rationale": "Legacy custom NLP pipelines are being superseded by foundation model APIs, requiring engineers to pivot toward LLM systems."
+    },
+    "Computer Vision Engineer": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Industrial edge vision and multi-modal models are seeing consistent commercial expansion in inspection, robotics, and logistics."
+    },
+    "AI Research Scientist": {
+      "hype_cycle_stage": "Innovation Trigger",
+      "years_to_plateau": "5–10 years",
+      "career_risk_profile": "Early Frontier",
+      "maturity_rationale": "Fundamental frontier model development and algorithmic breakthroughs carry high technical moats and specialized demand."
+    },
+    "Applied ML Scientist": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Directly impacts core business metrics by adapting modern algorithmic advances into production recommendation and search."
+    },
+    "AI Engineer": {
+      "hype_cycle_stage": "Peak of Inflated Expectations",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "High Hype / Volatile",
+      "maturity_rationale": "Role boundaries are rapidly crystallizing around full-stack LLM application orchestration, evaluations, and RAG pipelines."
+    },
+    "Data Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Essential foundation for analytics and AI; commanding high liquidity and sustained multi-industry hiring demand."
+    },
+    "Data Scientist": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Data science practices have matured into rigorous statistical experimentation, causal modeling, and measurable business value."
+    },
+    "Data Architect": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Enterprise data governance, lakehouse patterns, and data mesh architectures represent critical executive-level priorities."
+    },
+    "Analytics / Data Platform Engineer": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "High enterprise investment in unified modern data stacks, real-time ingestion, and scalable query engines."
+    },
+    "Data Analyst": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Standardized operational reporting, metric governance, and dashboarding are universally required in business units."
+    },
+    "ETL Developer": {
+      "hype_cycle_stage": "Trough of Disillusionment",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Legacy batch ETL is actively being replaced by code-first ELT tooling and streaming architectures."
+    },
+    "Database Administrator": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Managed cloud databases have evolved the DBA role toward high-availability, performance tuning, and access security."
+    },
+    "Platform Engineer": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Internal Developer Platforms (IDPs) are the dominant trend reducing developer cognitive load across high-growth engineering teams."
+    },
+    "Site Reliability Engineer (SRE)": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Observability practices, incident response, and SLA management are permanent operational imperatives for enterprise cloud systems."
+    },
+    "DevOps / DevSecOps Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Automated deployment pipelines and shifting security left represent deeply entrenched, high-demand industry standards."
+    },
+    "Cloud Security Engineer": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Multi-cloud governance, IAM hardening, and automated policy enforcement command high budget allocation from security leaders."
+    },
+    "Cloud Engineer / Architect": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Enterprise cloud transformations and infrastructure modernizations remain high-conviction, permanent market drivers."
+    },
+    "Cloud Infrastructure Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Declarative infrastructure-as-code and cost governance represent durable, non-volatile operational disciplines."
+    },
+    "Azure Cloud Platform Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Massive enterprise footprint across Fortune 500 corporations creates steady, resilient hiring demand."
+    },
+    "Cybersecurity Engineer": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Evolving threat vectors, ransomware defense, and strict compliance mandates guarantee defensive career stability."
+    },
+    "Security Analyst / Pen Tester": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Systematic vulnerability scanning, breach simulation, and red-teaming are institutionalized corporate requirements."
+    },
+    "Full Stack Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "High end-to-end product delivery flexibility across web, APIs, and cloud services makes this role perpetually marketable."
+    },
+    "Backend Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Distributed systems, transactional integrity, and service scalability provide enduring engineering relevance."
+    },
+    "Frontend Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Modern component frameworks, web performance optimization, and accessibility maintain stable mainstream demand."
+    },
+    "Software Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Fundamental algorithm design, software architecture, and system craftsmanship form the baseline of all tech employment."
+    },
+    "Software Development Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Standard high-velocity engineering role delivering core features and backend microservices across tech employers."
+    },
+    "Software Platform Engineer": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Focuses on developer experience, shared libraries, and internal APIs to scale software velocity enterprise-wide."
+    },
+    "Python Developer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Dominant programming language spanning AI/ML workflows, automation scripting, and backend web APIs."
+    },
+    "Java Developer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Deep enterprise entrenchment in banking, financial systems, and mission-critical high-throughput architectures."
+    },
+    ".Net Developer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Cross-platform enterprise software powerhouse with vast enterprise ecosystem adoption and long-term stability."
+    },
+    "Mobile App Developer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "iOS and Android mobile ecosystems are highly mature with steady demand across consumer and internal enterprise applications."
+    },
+    "Embedded Systems / Firmware Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Low-level silicon, microcontrollers, and RTOS development provide defensible career moats resistant to AI automation."
+    },
+    "Embedded Software Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Critical role bridging real-time operating systems, IoT sensors, and hardware-level driver execution."
+    },
+    "Quantum Computing Engineer": {
+      "hype_cycle_stage": "Innovation Trigger",
+      "years_to_plateau": "5–10 years",
+      "career_risk_profile": "Early Frontier",
+      "maturity_rationale": "Experimental quantum hardware, qubit error correction, and quantum algorithms represent a long-horizon research frontier."
+    },
+    "Edge AI Engineer": {
+      "hype_cycle_stage": "Innovation Trigger",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Early Frontier",
+      "maturity_rationale": "Model quantization, NPU acceleration, and TinyML are bringing intelligent inference directly to distributed edge devices."
+    },
+    "Robotics Engineer": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "5–10 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Industrial automation, mobile robotics, and computer vision integration are scaling into warehouse and medical production."
+    },
+    "Technical Product Manager": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Translates deep technical architecture into business strategy, commanding durable leadership demand across tech sectors."
+    },
+    "Technical Product Owner": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Drives backlog prioritization and technical specifications in agile engineering squads with established methodology."
+    },
+    "Technical Product Specialist": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Bridges customer technical requirements and product development with steady enterprise SaaS adoption."
+    },
+    "Product Management Lead": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Senior cross-functional leadership driving multi-product execution and enterprise product strategy."
+    },
+    "Product Management Director": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Executive-level product portfolio steering with high compensation and strategic organizational influence."
+    },
+    "Technical Project Manager": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Orchestrates complex multi-team technical delivery, milestones, and risk management with high organizational demand."
+    },
+    "Technical Project Lead": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Combines hands-on technical guidance with agile delivery execution for engineering milestones."
+    },
+    "Scrum Master": {
+      "hype_cycle_stage": "Trough of Disillusionment",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Pure agile coaching roles are consolidating into dual product owner or engineering manager responsibilities."
+    },
+    "Sales Engineer": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "High-value enterprise sales engineering delivering technical proof-of-concepts directly tied to company revenue."
+    },
+    "Business Analyst": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Standard business process modeling and requirements definition across corporate operations and IT systems."
+    },
+    "Customer Services Technical Specialist": {
+      "hype_cycle_stage": "Plateau of Productivity",
+      "years_to_plateau": "< 2 years",
+      "career_risk_profile": "Mature / Stable",
+      "maturity_rationale": "Provides tier-3 technical troubleshooting and escalation resolution for enterprise software clients."
+    },
+    "Product Risk And Fraud": {
+      "hype_cycle_stage": "Slope of Enlightenment",
+      "years_to_plateau": "2–5 years",
+      "career_risk_profile": "Enterprise Scaling (Sweet Spot)",
+      "maturity_rationale": "Combines fraud detection analytics, machine learning signals, and compliance risk defense in fintech and commerce."
+    }
+  }
+}

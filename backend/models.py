@@ -229,8 +229,18 @@ class RoleCard(BaseModel):
     growth_pct_6m: Optional[float] = None
     growth_pct_12m: Optional[float] = None
     growth_tier: Optional[str] = None
+    hype_cycle_stage: Optional[str] = None
+    years_to_plateau: Optional[str] = None
+    career_risk_profile: Optional[str] = None
+    maturity_rationale: Optional[str] = None
     emergence_score: Optional[float] = None
     shap_top_drivers: List[str] = Field(default_factory=list)
+
+    # Gartner Hype Cycle & Career Risk Profile
+    hype_cycle_stage: Optional[str] = None
+    years_to_plateau: Optional[str] = None
+    career_risk_profile: Optional[str] = None
+    maturity_rationale: Optional[str] = None
 
 
 class RecommendationRequest(BaseModel):
@@ -262,6 +272,10 @@ class RecommendationSnapshotItem(BaseModel):
     growth_pct_6m: Optional[float] = None
     growth_pct_12m: Optional[float] = None
     growth_tier: Optional[str] = None
+    hype_cycle_stage: Optional[str] = None
+    years_to_plateau: Optional[str] = None
+    career_risk_profile: Optional[str] = None
+    maturity_rationale: Optional[str] = None
     source_type: Optional[str] = None
     role_family: Optional[str] = None
     role_category: Optional[str] = None
@@ -361,6 +375,10 @@ class RoleSummary(BaseModel):
     growth_pct_6m: Optional[float] = None
     growth_pct_12m: Optional[float] = None
     growth_tier: Optional[str] = None
+    hype_cycle_stage: Optional[str] = None
+    years_to_plateau: Optional[str] = None
+    career_risk_profile: Optional[str] = None
+    maturity_rationale: Optional[str] = None
 
 
 class RoleDetail(BaseModel):
@@ -382,6 +400,10 @@ class RoleDetail(BaseModel):
     growth_pct_6m: Optional[float] = None
     growth_pct_12m: Optional[float] = None
     growth_tier: Optional[str] = None
+    hype_cycle_stage: Optional[str] = None
+    years_to_plateau: Optional[str] = None
+    career_risk_profile: Optional[str] = None
+    maturity_rationale: Optional[str] = None
     li_posting_count: Optional[int] = None
     li_unique_companies: Optional[int] = None
     required_skills: List[str] = Field(default_factory=list)
@@ -415,3 +437,203 @@ class ResultResponse(BaseModel):
     confidence: float
     top_career_matches: List[CareerMatch]
     secondary_suggestions: List[str]
+
+
+# ── Job Market Intelligence & Recommendation Schemas ──────────────────────────
+
+class JobListingSummary(BaseModel):
+    id: str
+    external_id: Optional[str] = None
+    title: str
+    normalized_title: str
+    company: str
+    location: str
+    location_type: str = "remote"  # remote, hybrid, onsite
+    salary_min: Optional[float] = None
+    salary_max: Optional[float] = None
+    currency: str = "USD"
+    experience_level: str = "Entry Level"
+    employment_type: str = "Full-time"
+    source: str = "Adzuna"
+    required_skills: List[str] = Field(default_factory=list)
+    preferred_skills: List[str] = Field(default_factory=list)
+    application_url: str
+    posted_at: Optional[str] = None
+    last_verified_at: Optional[str] = None
+    compatibility_score: Optional[float] = None
+    matching_skills: Optional[List[str]] = None
+    missing_skills: Optional[List[str]] = None
+
+
+class CompatibilityBreakdown(BaseModel):
+    overall_score: float  # 0 to 100
+    skill_match_score: float
+    experience_score: float
+    education_score: float
+    role_alignment_score: float
+    location_score: float
+    matching_skills: List[str] = Field(default_factory=list)
+    missing_mandatory_skills: List[str] = Field(default_factory=list)
+    missing_preferred_skills: List[str] = Field(default_factory=list)
+    why_matched: List[str] = Field(default_factory=list)
+    how_to_improve: List[str] = Field(default_factory=list)
+
+
+class JobListingDetail(JobListingSummary):
+    description: str
+    experience_min: Optional[float] = None
+    experience_max: Optional[float] = None
+    category: str = "IT Jobs"
+    salary_is_predicted: bool = False
+    compatibility_breakdown: Optional[CompatibilityBreakdown] = None
+
+
+class JobSearchQuery(BaseModel):
+    query: Optional[str] = None
+    location: Optional[str] = None
+    location_type: Optional[str] = None  # remote, hybrid, onsite
+    experience_level: Optional[str] = None
+    min_salary: Optional[float] = None
+    skills: Optional[List[str]] = None
+    sort_by: str = "date"  # date, relevance, salary, compatibility
+    page: int = 1
+    page_size: int = 20
+
+
+class JobListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    jobs: List[JobListingSummary]
+
+
+class ExtendedUserProfileInput(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    education: Optional[str] = None
+    degree_stream: Optional[str] = None
+    experience_level: Optional[str] = None
+    experience_years: Optional[float] = None
+    work_mode_preference: Optional[str] = None
+    declared_skills: Optional[List[str]] = None
+    declared_interests: Optional[List[str]] = None
+    target_roles: Optional[List[str]] = None
+    preferred_locations: Optional[List[str]] = None
+    projects: Optional[List[Dict[str, Any]]] = None
+    work_experience: Optional[List[Dict[str, Any]]] = None
+    certifications: Optional[List[Dict[str, Any]]] = None
+
+
+class ExtendedUserProfileResponse(BaseModel):
+    id: str
+    name: str
+    email: Optional[str] = None
+    education: str
+    degree_stream: str
+    experience_level: str
+    experience_years: float
+    work_mode_preference: str
+    declared_skills: List[str]
+    declared_interests: List[str]
+    target_roles: List[str]
+    preferred_locations: List[str]
+    projects: List[Dict[str, Any]]
+    work_experience: List[Dict[str, Any]]
+    certifications: List[Dict[str, Any]]
+    resume_filename: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class ResumeUploadResponse(BaseModel):
+    success: bool
+    filename: str
+    extracted_name: Optional[str] = None
+    extracted_email: Optional[str] = None
+    extracted_skills: List[str] = Field(default_factory=list)
+    extracted_education: Optional[str] = None
+    extracted_experience_years: Optional[float] = None
+    extracted_projects: List[Dict[str, Any]] = Field(default_factory=list)
+    raw_text_preview: str = ""
+
+
+class MissingSkillItem(BaseModel):
+    skill: str
+    frequency_in_jobs: int
+    frequency_pct: float
+    importance: str  # Critical, High, Moderate
+    sample_jobs: List[str] = Field(default_factory=list)
+
+
+class SkillGapMarketResponse(BaseModel):
+    possessed_skills: List[str] = Field(default_factory=list)
+    needs_improvement_skills: List[str] = Field(default_factory=list)
+    missing_skills: List[MissingSkillItem] = Field(default_factory=list)
+    total_target_jobs_analyzed: int
+    target_roles: List[str] = Field(default_factory=list)
+
+
+class ActionPlanItemDTO(BaseModel):
+    id: Optional[int] = None
+    stage: str  # Foundation, Core, Applied, Capstone
+    priority: int
+    title: str
+    description: str
+    target_skill: Optional[str] = None
+    why_needed: Optional[str] = None
+    learning_objectives: List[str] = Field(default_factory=list)
+    practice_project: Optional[str] = None
+    estimated_hours: int = 10
+    status: str = "not_started"
+    resources: List[Dict[str, str]] = Field(default_factory=list)
+
+
+class ActionPlanGenerateRequest(BaseModel):
+    user_id: str
+    target_role: str
+    target_job_id: Optional[str] = None
+
+
+class CareerActionPlanResponse(BaseModel):
+    id: str
+    user_id: str
+    target_role: str
+    title: str
+    summary: str
+    total_estimated_hours: int
+    items: List[ActionPlanItemDTO]
+    created_at: str
+    updated_at: str
+
+
+class ActionPlanItemUpdate(BaseModel):
+    status: str  # not_started, in_progress, completed
+
+
+class AIChatRequest(BaseModel):
+    message: str
+    user_id: Optional[str] = None
+    job_id: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+
+
+class AIChatResponse(BaseModel):
+    reply: str
+    grounded_facts: List[str] = Field(default_factory=list)
+    suggested_followups: List[str] = Field(default_factory=list)
+    cited_jobs: List[Dict[str, Any]] = Field(default_factory=list)
+    cited_skills: List[str] = Field(default_factory=list)
+
+
+class MarketOverviewResponse(BaseModel):
+    total_active_listings: int
+    new_this_week: int
+    top_demand_skills: List[Dict[str, Any]]
+    top_hiring_roles: List[Dict[str, Any]]
+    location_distribution: List[Dict[str, Any]]
+    work_mode_distribution: Dict[str, int]
+    experience_distribution: Dict[str, int]
+    salary_insights: Dict[str, Any]
+    emerging_roles_count: int
+    forecasted_roles_count: int

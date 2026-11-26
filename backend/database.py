@@ -93,7 +93,35 @@ def get_session() -> Session:
 def init_db(custom_engine=None) -> None:
     """
     Create all tables in the database if they don't already exist.
+    Also handles safe non-destructive column additions for existing SQLite tables.
     """
     from backend import db_models  # Import to register models with Base.metadata
+    from sqlalchemy import text
     target_engine = custom_engine or engine
     Base.metadata.create_all(bind=target_engine)
+
+    # Safe SQLite column migration for User table
+    try:
+        with target_engine.connect() as conn:
+            # Check users table columns
+            res = conn.execute(text("PRAGMA table_info(users)"))
+            existing_cols = {row[1] for row in res.fetchall()}
+            
+            new_cols = [
+                ("target_roles", "TEXT DEFAULT '[]'"),
+                ("preferred_locations", "TEXT DEFAULT '[]'"),
+                ("work_mode_preference", "VARCHAR(50) DEFAULT 'any'"),
+                ("experience_years", "FLOAT DEFAULT 0.0"),
+                ("projects", "TEXT DEFAULT '[]'"),
+                ("work_experience", "TEXT DEFAULT '[]'"),
+                ("certifications", "TEXT DEFAULT '[]'"),
+                ("resume_text", "TEXT DEFAULT ''"),
+                ("resume_filename", "VARCHAR(255) DEFAULT ''"),
+            ]
+            for col_name, col_def in new_cols:
+                if col_name not in existing_cols:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}"))
+            conn.commit()
+    except Exception as e:
+        # Ignore if tables are newly created or engine doesn't support PRAGMA
+        pass

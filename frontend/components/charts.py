@@ -75,3 +75,101 @@ def render_comparison_chart(roles_data: List[Dict[str, float]]) -> None:
         return
     df = pd.DataFrame(roles_data).set_index("Role")
     st.bar_chart(df)
+
+
+def render_skill_halflife_chart(skills_data: List[Dict[str, Any]]) -> None:
+    """Render an interactive Plotly horizontal bar chart of skill half-life and risk."""
+    import plotly.graph_objects as go
+
+    if not skills_data:
+        return
+
+    skills = [s["skill"] for s in skills_data]
+    half_lives = [s["half_life_months"] for s in skills_data]
+    risks = [s["shock_risk"] for s in skills_data]
+    categories = [s["category"] for s in skills_data]
+
+    color_map = {
+        "high_vulnerability": "#EF4444",
+        "augmented": "#F59E0B",
+        "antifragile": "#10B981",
+    }
+    colors = [color_map.get(c, "#6B7280") for c in categories]
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            y=skills,
+            x=half_lives,
+            orientation="h",
+            marker=dict(color=colors, line=dict(color="rgba(255,255,255,0.2)", width=1)),
+            text=[f"{hl} mo (Risk: {r}%)" for hl, r in zip(half_lives, risks)],
+            textposition="auto",
+            hovertemplate="<b>%{y}</b><br>Projected Half-Life: %{x} months<br>Displacement Risk: %{text}<extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        title="⏳ Projected Skill Half-Life Under Selected AI Shock (Months)",
+        xaxis_title="Half-Life (Months before 50% Automation Decay)",
+        yaxis_title="Skill",
+        height=max(320, len(skills) * 42),
+        margin=dict(l=20, r=20, t=45, b=35),
+        template="plotly_dark",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def render_shock_comparison_chart(stressed_roles: List[Dict[str, Any]]) -> None:
+    """Render a Plotly grouped comparison chart of Pre-Shock vs Post-Shock role scores."""
+    import plotly.graph_objects as go
+
+    if not stressed_roles:
+        return
+
+    # Take top 6 roles
+    roles = stressed_roles[:6]
+    names = [r["role_name"] for r in roles]
+    orig_scores = [r["original_score"] for r in roles]
+    shocked_scores = [r["shocked_score"] for r in roles]
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            x=names,
+            y=orig_scores,
+            name="Baseline Fit Score",
+            marker_color="#6366F1",
+            text=[f"{s}%" for s in orig_scores],
+            textposition="auto",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            x=names,
+            y=shocked_scores,
+            name="Post-Shock Fit Score",
+            marker_color="#EC4899",
+            text=[f"{s}%" for s in shocked_scores],
+            textposition="auto",
+        )
+    )
+
+    fig.update_layout(
+        title="⚡ Market Role Fit: Baseline vs Post-Shock Displacement",
+        xaxis_title="Role",
+        yaxis_title="Match Score (%)",
+        barmode="group",
+        height=380,
+        margin=dict(l=20, r=20, t=45, b=35),
+        template="plotly_dark",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+

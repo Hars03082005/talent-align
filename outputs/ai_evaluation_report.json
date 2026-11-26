@@ -1,0 +1,15 @@
+{
+  "benchmark_summary": {
+    "total_queries": 16,
+    "routing_accuracy_pct": 100.0,
+    "retrieval_hit_rate_at_5_pct": 68.8,
+    "retrieval_precision_at_5_pct": 37.5,
+    "resume_extraction": {
+      "precision_pct": 78.3,
+      "recall_pct": 100.0,
+      "f1_score_pct": 87.8
+    },
+    "validator_rejection_rate_pct": 100.0
+  },
+  "status": "PASSED"
+}

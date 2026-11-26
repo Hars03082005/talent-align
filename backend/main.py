@@ -34,13 +34,14 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, status, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 # Internal database & repository imports
 from backend.database import get_db, init_db
 from backend import db_repository as repo
+from backend.db_models import JobListing, SavedJob, User
 from backend.data_loader import (
     build_role_index,
     get_emerging_roles,
@@ -48,6 +49,7 @@ from backend.data_loader import (
     get_role_by_id,
     get_role_by_name,
     load_role_catalog,
+    sanitize_role_name,
 )
 from backend.models import (
     AssessmentCompleteRequest,
@@ -78,6 +80,31 @@ from backend.models import (
     UserProfileInput,
     UserResponse,
     UserUpdate,
+    # New SaaS Job Intelligence Schemas
+    AIChatRequest,
+    AIChatResponse,
+    ActionPlanGenerateRequest,
+    ActionPlanItemDTO,
+    ActionPlanItemUpdate,
+    CareerActionPlanResponse,
+    CompatibilityBreakdown,
+    ExtendedUserProfileInput,
+    ExtendedUserProfileResponse,
+    JobListingDetail,
+    JobListingSummary,
+    JobListResponse,
+    JobSearchQuery,
+    MarketOverviewResponse,
+    ResumeUploadResponse,
+    SkillGapMarketResponse,
+)
+from backend.services import (
+    action_plan_service,
+    ai_assistant_service,
+    job_service,
+    matching_service,
+    resume_service,
+    skill_gap_service,
 )
 from backend.questionnaire_engine import ARCHETYPE_NAMES, QuestionnaireEngine
 from src.recommendation.profile_engine import build_user_profile
@@ -132,9 +159,23 @@ async def lifespan(app: FastAPI):
     try:
         init_db()
         logger.info("SQLite application database initialized.")
+        # Ensure authentic jobs are ingested from Adzuna dataset
+        db = next(get_db())
+        try:
+            job_service.ensure_jobs_ingested(db)
+        finally:
+            db.close()
+        # Start APScheduler background sync for daily jobs
+        from backend.jobs.scheduler import start_job_scheduler, stop_job_scheduler
+        start_job_scheduler()
     except Exception as e:
         logger.error(f"Failed to initialize database on startup: {e}", exc_info=True)
     yield
+    try:
+        from backend.jobs.scheduler import stop_job_scheduler
+        stop_job_scheduler()
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -151,16 +192,32 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "*",
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register AI & Resume routers
+from backend.routers.ai_chat import router as ai_chat_router
+from backend.routers.ai_resume import router as ai_resume_router
+from backend.routers.jobs import router as jobs_router
+
+app.include_router(ai_chat_router)
+app.include_router(ai_resume_router)
+app.include_router(jobs_router)
 
 
 # Load at startup
 QUESTIONNAIRE_PATH = Path(__file__).resolve().parent / "questionnaire.json"
 engine = QuestionnaireEngine(QUESTIONNAIRE_PATH)
-matcher = RoleMatcher()
+matcher = RoleMatcher(catalog=load_role_catalog())
 sessions: Dict[str, SessionState] = {}
 session_lock = asyncio.Lock()
 
@@ -243,10 +300,12 @@ def _role_dict_to_card(r: Dict[str, Any]) -> RoleCard:
         cs = cs.dict()
     elif not isinstance(cs, dict):
         cs = {}
+    r_id = r.get("role_id") or ""
+    r_name = sanitize_role_name(r_id, r.get("role_name", ""))
     return RoleCard(
         rank=r.get("rank", 0),
         role_id=r.get("role_id"),
-        role_name=r.get("role_name", ""),
+        role_name=r_name,
         source_type=r.get("source_type"),
         role_family=r.get("role_family"),
         role_category=r.get("role_category"),
@@ -272,16 +331,21 @@ def _role_dict_to_card(r: Dict[str, Any]) -> RoleCard:
         growth_tier=r.get("growth_tier"),
         emergence_score=r.get("emergence_score"),
         shap_top_drivers=r.get("shap_top_drivers", []),
+        hype_cycle_stage=r.get("hype_cycle_stage"),
+        years_to_plateau=r.get("years_to_plateau"),
+        career_risk_profile=r.get("career_risk_profile"),
+        maturity_rationale=r.get("maturity_rationale"),
     )
 
 
 def _snapshot_to_card(snap: Any) -> RoleCard:
     """Convert a database RecommendationSnapshot to RoleCard."""
     cs_dict = json.loads(snap.component_scores or "{}")
+    r_name = sanitize_role_name(snap.role_id, snap.role_name)
     return RoleCard(
         rank=snap.rank,
         role_id=snap.role_id,
-        role_name=snap.role_name,
+        role_name=r_name,
         source_type=snap.source_type,
         role_family=snap.role_family,
         role_category=snap.role_category,
@@ -307,6 +371,10 @@ def _snapshot_to_card(snap: Any) -> RoleCard:
         growth_tier=snap.growth_tier,
         emergence_score=snap.emergence_score,
         shap_top_drivers=json.loads(snap.shap_top_drivers or "[]"),
+        hype_cycle_stage=getattr(snap, "hype_cycle_stage", None),
+        years_to_plateau=getattr(snap, "years_to_plateau", None),
+        career_risk_profile=getattr(snap, "career_risk_profile", None),
+        maturity_rationale=getattr(snap, "maturity_rationale", None),
     )
 
 
@@ -776,6 +844,8 @@ async def get_recommendations(
 
     # Run matcher (pure computation)
     top_recs, secondary_recs = matcher.rank(profile_dict)
+    for rec in top_recs + secondary_recs:
+        rec["role_name"] = sanitize_role_name(rec.get("role_id", ""), rec.get("role_name", ""))
 
     # Persist recommendations and immutable snapshots to SQLite
     repo.save_recommendations_and_snapshots(
@@ -966,6 +1036,10 @@ async def get_full_catalog() -> List[RoleSummary]:
             growth_pct_6m=r.get("growth_pct_6m"),
             growth_pct_12m=r.get("growth_pct_12m"),
             growth_tier=r.get("growth_tier"),
+            hype_cycle_stage=r.get("hype_cycle_stage"),
+            years_to_plateau=r.get("years_to_plateau"),
+            career_risk_profile=r.get("career_risk_profile"),
+            maturity_rationale=r.get("maturity_rationale"),
         )
         for r in catalog
     ]
@@ -990,6 +1064,10 @@ async def get_emerging_roles_endpoint() -> List[RoleSummary]:
             growth_pct_6m=r.get("growth_pct_6m"),
             growth_pct_12m=r.get("growth_pct_12m"),
             growth_tier=r.get("growth_tier"),
+            hype_cycle_stage=r.get("hype_cycle_stage"),
+            years_to_plateau=r.get("years_to_plateau"),
+            career_risk_profile=r.get("career_risk_profile"),
+            maturity_rationale=r.get("maturity_rationale"),
         )
         for r in roles
     ]
@@ -1014,6 +1092,10 @@ async def get_known_roles_endpoint() -> List[RoleSummary]:
             growth_pct_6m=r.get("growth_pct_6m"),
             growth_pct_12m=r.get("growth_pct_12m"),
             growth_tier=r.get("growth_tier"),
+            hype_cycle_stage=r.get("hype_cycle_stage"),
+            years_to_plateau=r.get("years_to_plateau"),
+            career_risk_profile=r.get("career_risk_profile"),
+            maturity_rationale=r.get("maturity_rationale"),
         )
         for r in roles
     ]
@@ -1045,6 +1127,10 @@ async def get_role_detail(role_id: str) -> RoleDetail:
         growth_pct_6m=role.get("growth_pct_6m"),
         growth_pct_12m=role.get("growth_pct_12m"),
         growth_tier=role.get("growth_tier"),
+        hype_cycle_stage=role.get("hype_cycle_stage"),
+        years_to_plateau=role.get("years_to_plateau"),
+        career_risk_profile=role.get("career_risk_profile"),
+        maturity_rationale=role.get("maturity_rationale"),
         li_posting_count=role.get("li_posting_count"),
         li_unique_companies=role.get("li_unique_companies"),
         required_skills=role.get("required_skills") or [],
@@ -1116,3 +1202,341 @@ async def get_roadmap_by_id(role_id: str, user_skills: str = "") -> RoadmapRespo
     skills = [s.strip() for s in user_skills.split(",") if s.strip()] if user_skills else []
     req = RoadmapRequest(role_id=role_id, user_skills=skills)
     return await get_roadmap(req)
+
+
+# ══════════════════════════════════════════════════════════════════════════════════
+# NEW PRODUCTION SAAS JOB INTELLIGENCE & MATCHING ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════════
+
+# ── 1. Job Market Intelligence & Search ────────────────────────────────────────
+
+@app.get("/jobs", response_model=JobListResponse, tags=["Job Intelligence"])
+async def get_jobs_endpoint(
+    query: Optional[str] = None,
+    location: Optional[str] = None,
+    location_type: Optional[str] = None,
+    experience_level: Optional[str] = None,
+    min_salary: Optional[float] = None,
+    sort_by: str = "date",
+    page: int = 1,
+    page_size: int = 20,
+    user_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> JobListResponse:
+    """
+    Search and filter authentic job listings with multi-dimensional criteria.
+    Optionally computes live compatibility scores if user_id is provided.
+    """
+    user = db.query(User).filter(User.id == user_id).first() if user_id else None
+
+    jobs, total = job_service.search_jobs(
+        db=db,
+        query=query,
+        location=location,
+        location_type=location_type,
+        experience_level=experience_level,
+        min_salary=min_salary,
+        sort_by=sort_by,
+        page=page,
+        page_size=page_size,
+    )
+
+    summaries: List[JobListingSummary] = []
+    for j in jobs:
+        d = j.to_summary_dict()
+        if user:
+            breakdown = matching_service.calculate_job_compatibility(user, j)
+            d["compatibility_score"] = breakdown.overall_score
+            d["matching_skills"] = breakdown.matching_skills
+            d["missing_skills"] = breakdown.missing_mandatory_skills
+        summaries.append(JobListingSummary(**d))
+
+    if sort_by == "compatibility" and user:
+        summaries.sort(key=lambda x: (x.compatibility_score or 0.0), reverse=True)
+
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    return JobListResponse(
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        jobs=summaries,
+    )
+
+
+@app.get("/jobs/{job_id}", response_model=JobListingDetail, tags=["Job Intelligence"])
+async def get_job_detail_endpoint(
+    job_id: str,
+    user_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> JobListingDetail:
+    """Retrieve full details of an authentic job listing with granular compatibility breakdown."""
+    job = job_service.get_job_by_id(db, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job listing not found.")
+
+    d = job.to_detail_dict()
+    if user_id:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            d["compatibility_breakdown"] = matching_service.calculate_job_compatibility(user, job)
+            d["compatibility_score"] = d["compatibility_breakdown"].overall_score
+
+    return JobListingDetail(**d)
+
+
+@app.get("/jobs/matches/{user_id}", response_model=List[JobListingSummary], tags=["Job Intelligence"])
+async def get_personalized_matches(
+    user_id: str,
+    limit: int = 30,
+    db: Session = Depends(get_db),
+) -> List[JobListingSummary]:
+    """Retrieve personalized job recommendations ranked by profile compatibility score."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User profile not found.")
+
+    ranked = matching_service.rank_jobs_for_candidate(db, user, limit=limit)
+    summaries: List[JobListingSummary] = []
+    for job, breakdown in ranked:
+        d = job.to_summary_dict()
+        d["compatibility_score"] = breakdown.overall_score
+        d["matching_skills"] = breakdown.matching_skills
+        d["missing_skills"] = breakdown.missing_mandatory_skills
+        summaries.append(JobListingSummary(**d))
+
+    return summaries
+
+
+@app.post("/jobs/{job_id}/save", tags=["Job Intelligence"])
+async def save_job_endpoint(
+    job_id: str,
+    user_id: str = Query(...),
+    notes: str = Query(default=""),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Save/bookmark an authentic job opportunity for a candidate."""
+    saved = job_service.save_user_job(db, user_id=user_id, job_id=job_id, notes=notes)
+    return {"status": "saved", "job_id": job_id, "saved_at": saved.saved_at.isoformat()}
+
+
+@app.delete("/jobs/{job_id}/save", tags=["Job Intelligence"])
+async def unsave_job_endpoint(
+    job_id: str,
+    user_id: str = Query(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Remove a saved job opportunity."""
+    removed = job_service.unsave_user_job(db, user_id=user_id, job_id=job_id)
+    return {"status": "removed" if removed else "not_found", "job_id": job_id}
+
+
+@app.get("/users/{user_id}/saved-jobs", response_model=List[JobListingSummary], tags=["Job Intelligence"])
+async def get_saved_jobs_endpoint(
+    user_id: str,
+    db: Session = Depends(get_db),
+) -> List[JobListingSummary]:
+    """Retrieve all saved jobs for a candidate."""
+    jobs = job_service.get_user_saved_jobs(db, user_id=user_id)
+    user = db.query(User).filter(User.id == user_id).first()
+    summaries: List[JobListingSummary] = []
+    for j in jobs:
+        d = j.to_summary_dict()
+        if user:
+            breakdown = matching_service.calculate_job_compatibility(user, j)
+            d["compatibility_score"] = breakdown.overall_score
+            d["matching_skills"] = breakdown.matching_skills
+            d["missing_skills"] = breakdown.missing_mandatory_skills
+        summaries.append(JobListingSummary(**d))
+    return summaries
+
+
+@app.get("/market/overview", response_model=MarketOverviewResponse, tags=["Job Intelligence"])
+async def get_market_overview(db: Session = Depends(get_db)) -> MarketOverviewResponse:
+    """Retrieve aggregate market intelligence statistics across verified job listings."""
+    stats = job_service.get_market_overview_stats(db)
+    return MarketOverviewResponse(**stats)
+
+
+# ── 2. Candidate Extended Profile & Resume Ingestion ───────────────────────────
+
+@app.get("/profile/{user_id}", response_model=ExtendedUserProfileResponse, tags=["Candidate Profile"])
+async def get_extended_profile(
+    user_id: str,
+    db: Session = Depends(get_db),
+) -> ExtendedUserProfileResponse:
+    """Retrieve complete candidate profile including skills, projects, and career preferences."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    return ExtendedUserProfileResponse(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        education=user.education or "",
+        degree_stream=user.degree_stream or "",
+        experience_level=user.experience_level or "Entry Level",
+        experience_years=float(user.experience_years or 0.0),
+        work_mode_preference=user.work_mode_preference or "any",
+        declared_skills=user.get_declared_skills(),
+        declared_interests=user.get_declared_interests(),
+        target_roles=user.get_target_roles(),
+        preferred_locations=user.get_preferred_locations(),
+        projects=user.get_projects(),
+        work_experience=user.get_work_experience(),
+        certifications=user.get_certifications(),
+        resume_filename=user.resume_filename,
+        created_at=user.created_at.isoformat() if user.created_at else "",
+        updated_at=user.updated_at.isoformat() if user.updated_at else "",
+    )
+
+
+@app.put("/profile/{user_id}", response_model=ExtendedUserProfileResponse, tags=["Candidate Profile"])
+async def update_extended_profile(
+    user_id: str,
+    payload: ExtendedUserProfileInput,
+    db: Session = Depends(get_db),
+) -> ExtendedUserProfileResponse:
+    """Update or upsert candidate profile attributes, skills, and preferences."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        user = User(
+            id=user_id,
+            name=payload.name or "Candidate",
+            email=payload.email,
+        )
+        db.add(user)
+        db.flush()
+
+    if payload.name is not None:
+        user.name = payload.name
+    if payload.email is not None:
+        user.email = payload.email
+    if payload.education is not None:
+        user.education = payload.education
+    if payload.degree_stream is not None:
+        user.degree_stream = payload.degree_stream
+    if payload.experience_level is not None:
+        user.experience_level = payload.experience_level
+    if payload.experience_years is not None:
+        user.experience_years = payload.experience_years
+    if payload.work_mode_preference is not None:
+        user.work_mode_preference = payload.work_mode_preference
+    if payload.declared_skills is not None:
+        user.set_declared_skills(payload.declared_skills)
+    if payload.declared_interests is not None:
+        user.set_declared_interests(payload.declared_interests)
+    if payload.target_roles is not None:
+        user.set_target_roles(payload.target_roles)
+    if payload.preferred_locations is not None:
+        user.set_preferred_locations(payload.preferred_locations)
+    if payload.projects is not None:
+        user.set_projects(payload.projects)
+    if payload.work_experience is not None:
+        user.set_work_experience(payload.work_experience)
+    if payload.certifications is not None:
+        user.set_certifications(payload.certifications)
+
+    db.commit()
+    db.refresh(user)
+    return await get_extended_profile(user_id=user.id, db=db)
+
+
+@app.post("/profile/upload-resume", response_model=ResumeUploadResponse, tags=["Candidate Profile"])
+async def upload_resume(
+    file: UploadFile = File(...),
+) -> ResumeUploadResponse:
+    """
+    Upload and parse PDF resume into structured candidate profile suggestions.
+    Always returns draft for candidate verification prior to persistence.
+    """
+    if not file.filename.lower().endswith((".pdf", ".txt")):
+        raise HTTPException(status_code=400, detail="Only PDF and TXT resumes are supported.")
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size exceeds maximum 10MB limit.")
+
+    parsed = resume_service.parse_resume_content(file.filename, content)
+    return parsed
+
+
+# ── 3. Market Skill Gap & Career Action Plan ───────────────────────────────────
+
+@app.post("/skill-gap/market", response_model=SkillGapMarketResponse, tags=["Career Development"])
+async def get_market_skill_gap_endpoint(
+    user_id: str = Query(...),
+    target_role: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> SkillGapMarketResponse:
+    """Analyze candidate skill gap against active employer postings for their target role."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User profile not found.")
+
+    return skill_gap_service.compute_market_skill_gap(db, user, target_role=target_role)
+
+
+@app.post("/action-plan/generate", response_model=CareerActionPlanResponse, tags=["Career Development"])
+async def generate_action_plan_endpoint(
+    payload: ActionPlanGenerateRequest,
+    db: Session = Depends(get_db),
+) -> CareerActionPlanResponse:
+    """Generate a personalized, evidence-based 4-stage action plan targeting market requirements."""
+    user = db.query(User).filter(User.id == payload.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User profile not found.")
+
+    plan = action_plan_service.generate_action_plan(
+        db=db,
+        user=user,
+        target_role=payload.target_role,
+        target_job_id=payload.target_job_id,
+    )
+    return CareerActionPlanResponse(**plan.to_dict())
+
+
+@app.get("/action-plan/{user_id}", response_model=List[CareerActionPlanResponse], tags=["Career Development"])
+async def get_user_action_plans_endpoint(
+    user_id: str,
+    db: Session = Depends(get_db),
+) -> List[CareerActionPlanResponse]:
+    """Retrieve all generated career action plans for a candidate."""
+    plans = action_plan_service.get_user_action_plans(db, user_id=user_id)
+    return [CareerActionPlanResponse(**p.to_dict()) for p in plans]
+
+
+@app.patch("/action-plan/item/{item_id}", tags=["Career Development"])
+async def update_action_item_status_endpoint(
+    item_id: int,
+    payload: ActionPlanItemUpdate,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Update progress status (not_started, in_progress, completed) for an action plan item."""
+    updated = action_plan_service.update_action_item_status(db, item_id, payload.status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Action plan item not found.")
+    return {"status": "updated", "item_id": item_id, "new_status": payload.status}
+
+
+# ── 4. Grounded AI Career Assistant ────────────────────────────────────────────
+
+@app.post("/ai/chat", response_model=AIChatResponse, tags=["AI Assistant"])
+async def ai_career_assistant_chat(
+    payload: AIChatRequest,
+    db: Session = Depends(get_db),
+) -> AIChatResponse:
+    """
+    Grounded AI Career Assistant powered by RAG over verified job listings,
+    candidate profiles, skill gap analysis, and 60-role forecast models.
+    """
+    user = db.query(User).filter(User.id == payload.user_id).first() if payload.user_id else None
+    return ai_assistant_service.answer_career_query(
+        db=db,
+        user=user,
+        message=payload.message,
+        job_id=payload.job_id,
+        context=payload.context,
+    )
+

@@ -1,22 +1,27 @@
 @echo off
-REM start_app.bat -- Windows startup script for Proactive Talent Alignment
-REM Starts FastAPI backend (port 8000) and Streamlit frontend (port 8501)
+echo ======================================================================
+echo Starting TalentAlign - Proactive Talent Alignment Platform
+echo ======================================================================
 
-echo ============================================================
-echo  Proactive Talent Alignment for Sustainable Employment
-echo ============================================================
-echo.
-echo Starting FastAPI backend on http://localhost:8000 ...
-start "FastAPI Backend" cmd /k "uvicorn backend.main:app --reload --port 8000"
+echo [1/3] Verifying Python environment...
+python --version
+if errorlevel 1 (
+    echo [ERROR] Python is not installed or not in PATH.
+    pause
+    exit /b 1
+)
 
-timeout /t 3 /nobreak > nul
+echo [2/3] Launching FastAPI Backend on http://localhost:8000 ...
+start "TalentAlign Backend (FastAPI)" cmd /k "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
 
-echo Starting Streamlit frontend on http://localhost:8501 ...
-start "Streamlit Frontend" cmd /k "streamlit run frontend/app.py --server.port 8501"
+echo [3/3] Launching React Vite Frontend on http://localhost:5173 ...
+cd frontend
+start "TalentAlign Frontend (Vite)" cmd /k "npm run dev"
+cd ..
 
-echo.
-echo Both services started.
-echo Backend API docs: http://localhost:8000/docs
-echo Frontend UI:      http://localhost:8501
-echo.
-pause
+echo ======================================================================
+echo Services started successfully!
+echo   * Backend REST API: http://localhost:8000
+echo   * Swagger API Docs: http://localhost:8000/docs
+echo   * Web Application:  http://localhost:5173
+echo ======================================================================

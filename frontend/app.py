@@ -28,11 +28,14 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-# Add workspace root to sys.path
+# Add workspace root and frontend dir to sys.path
 _this_file = Path(__file__).resolve()
-BASE_DIR = _this_file.parents[2] if "app" in _this_file.parts else _this_file.parents[1]
+BASE_DIR = _this_file.parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
+_frontend_dir = _this_file.parent
+if str(_frontend_dir) not in sys.path:
+    sys.path.insert(0, str(_frontend_dir))
 
 # Local database & ML imports
 try:
@@ -67,6 +70,7 @@ from src.recommendation.profile_engine import build_user_profile
 from src.recommendation.role_matcher import RoleMatcher
 from src.recommendation.skill_gap import compute_skill_gap
 from src.recommendation.roadmap import generate_roadmap
+from src.analytics.ai_stress_tester import AIStressTester, SCENARIOS
 
 try:
     from frontend.components.charts import (
@@ -74,18 +78,22 @@ try:
         render_score_triad,
         render_component_breakdown_chart,
         render_comparison_chart,
+        render_skill_halflife_chart,
+        render_shock_comparison_chart,
     )
     from frontend.components.cards import render_role_card, render_catalog_role_card
     from frontend.components.roadmap_display import render_skill_gap_section, render_learning_roadmap
 except ImportError:
-    from app.frontend.components.charts import (
+    from components.charts import (
         render_baio_bar_chart,
         render_score_triad,
         render_component_breakdown_chart,
         render_comparison_chart,
+        render_skill_halflife_chart,
+        render_shock_comparison_chart,
     )
-    from app.frontend.components.cards import render_role_card, render_catalog_role_card
-    from app.frontend.components.roadmap_display import render_skill_gap_section, render_learning_roadmap
+    from components.cards import render_role_card, render_catalog_role_card
+    from components.roadmap_display import render_skill_gap_section, render_learning_roadmap
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 _q_candidates = [
@@ -924,7 +932,425 @@ def _load_historical_session(session_id: str) -> None:
         st.error(f"Failed to restore historical session: {e}")
 
 
-# ── Main Application Router ───────────────────────────────────────────────────
+# ── Page 10: Career Timeline Projection ──────────────────────────────────────
+
+
+def render_career_timeline_page():
+    """12-month visual career timeline for the user's #1 recommended role."""
+    st.markdown("## 🗓️ 12-Month Career Timeline Projection")
+    st.caption(
+        "A personalised, month-by-month skill-acquisition plan mapped to your "
+        "top recommended role and current skill profile."
+    )
+    st.divider()
+
+    # Role selection
+    catalog   = load_role_catalog()
+    all_names = [r["role_name"] for r in catalog]
+    top_recs  = st.session_state.get("top_recommendations", [])
+    default_role = top_recs[0]["role_name"] if top_recs else (all_names[0] if all_names else "")
+
+    selected_role_name = st.selectbox(
+        "Select the role to project your career timeline for:",
+        all_names,
+        index=all_names.index(default_role) if default_role in all_names else 0,
+        key="timeline_role_select",
+    )
+
+    role = get_role_by_name(selected_role_name)
+    if not role:
+        st.error("Role not found in catalog.")
+        return
+
+    user_skills = set(s.lower() for s in st.session_state.get("declared_skills", []))
+    required    = [s for s in (role.get("required_skills") or []) if s.lower() not in user_skills]
+    frontier    = [s for s in (role.get("frontier_skills") or []) if s.lower() not in user_skills]
+    have        = [s for s in (role.get("required_skills") or []) if s.lower() in user_skills]
+    growth      = role.get("growth_pct_6m") or role.get("forecast_growth_pct_cluster") or 0.0
+    family      = role.get("role_family") or "IT"
+
+    # ── Hero banner
+    growth_color = "#22c55e" if growth >= 0 else "#f97316"
+    st.markdown(
+        f"""
+        <div style='background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:14px;
+             padding:20px 28px;margin-bottom:20px;border:1px solid #334155'>
+          <h2 style='color:#f1f5f9;margin:0 0 4px 0'>🎯 {selected_role_name}</h2>
+          <p style='color:#94a3b8;margin:0;font-size:14px'>
+            {family} &nbsp;·&nbsp;
+            <span style='color:{growth_color};font-weight:600'>Market Growth: {growth:+.0f}%</span>
+            &nbsp;·&nbsp; {len(have)} skills already mastered
+            &nbsp;·&nbsp; {len(required)} skills to build
+          </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ── Assign skills to phases
+    phase1_skills = required[:3] or ["Foundations TBD"]
+    phase2_skills = required[3:7] or ["Core skills TBD"]
+    phase3_skills = (required[7:] + frontier[:3]) or ["Advanced skills TBD"]
+
+    # Milestone project suggestions per phase (generic rule-based)
+    projects_map = {
+        "Artificial Intelligence & Machine Learning": [
+            "Build a binary classifier on a Kaggle dataset (Month 2)",
+            "Deploy a FastAPI ML inference endpoint (Month 5)",
+            "Fine-tune an open-source LLM on domain data (Month 9)",
+        ],
+        "Data & Analytics": [
+            "EDA + dashboard on a public dataset (Month 2)",
+            "Build an automated ETL + SQL warehouse (Month 5)",
+            "Real-time streaming pipeline with Kafka/Spark (Month 10)",
+        ],
+        "Cloud & Infrastructure": [
+            "Deploy a multi-service app on AWS Free Tier (Month 2)",
+            "Automate infra with Terraform + GitHub Actions (Month 5)",
+            "Design a HA multi-region architecture (Month 9)",
+        ],
+    }
+    default_projects = [
+        "Build a portfolio project demonstrating Phase 1 skills (Month 2)",
+        "Contribute to an open-source project in your domain (Month 6)",
+        "Complete an industry certification exam (Month 10)",
+    ]
+    projects = projects_map.get(family, default_projects)
+
+    # ── Phase cards with HTML visual timeline
+    PHASES = [
+        {
+            "label": "Phase 1 · Months 1–3",
+            "subtitle": "Foundation & Core Tooling",
+            "color_bg":  "#1e3a5f",
+            "color_border": "#3b82f6",
+            "color_badge": "#60a5fa",
+            "icon": "🌱",
+            "skills": phase1_skills,
+            "milestone": projects[0] if projects else "",
+            "cert": "LinkedIn Learning / Coursera specialisation",
+            "months": ["Jan", "Feb", "Mar"],
+        },
+        {
+            "label": "Phase 2 · Months 4–8",
+            "subtitle": "Hands-On Projects & Role-Ready Skills",
+            "color_bg":  "#3b1f5f",
+            "color_border": "#a855f7",
+            "color_badge": "#c084fc",
+            "icon": "⚡",
+            "skills": phase2_skills,
+            "milestone": projects[1] if len(projects) > 1 else "",
+            "cert": "Official vendor cert (AWS/GCP/Azure/Google ML)",
+            "months": ["Apr", "May", "Jun", "Jul", "Aug"],
+        },
+        {
+            "label": "Phase 3 · Months 9–12",
+            "subtitle": "Frontier Skills & Portfolio Polish",
+            "color_bg":  "#1a3d2e",
+            "color_border": "#22c55e",
+            "color_badge": "#4ade80",
+            "icon": "🚀",
+            "skills": phase3_skills,
+            "milestone": projects[2] if len(projects) > 2 else "",
+            "cert": "Advanced / professional-level certification",
+            "months": ["Sep", "Oct", "Nov", "Dec"],
+        },
+    ]
+
+    # ── Visual timeline strip
+    month_html = ""
+    colors  = ["#3b82f6", "#3b82f6", "#3b82f6",
+               "#a855f7", "#a855f7", "#a855f7", "#a855f7", "#a855f7",
+               "#22c55e", "#22c55e", "#22c55e", "#22c55e"]
+    m_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    for m, c in zip(m_labels, colors):
+        month_html += (
+            f"<div style='display:inline-block;width:60px;text-align:center;margin:0 4px'>"
+            f"<div style='background:{c};border-radius:50%;width:28px;height:28px;"
+            f"margin:0 auto 4px;display:flex;align-items:center;justify-content:center;"
+            f"font-size:10px;font-weight:700;color:#fff'>{m[:1]}</div>"
+            f"<div style='font-size:11px;color:#94a3b8'>{m}</div></div>"
+        )
+    st.markdown(
+        f"<div style='background:#0f172a;border-radius:12px;padding:16px 20px;margin-bottom:24px;"
+        f"border:1px solid #1e293b;white-space:nowrap;overflow-x:auto'>"
+        f"<div style='font-size:12px;color:#64748b;margin-bottom:10px'>📅 12-Month Timeline</div>"
+        f"{month_html}</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Phase detail cards
+    for ph in PHASES:
+        skills_html = "".join(
+            f"<span style='background:#1e293b;border:1px solid {ph['color_border']};"
+            f"color:{ph['color_badge']};padding:3px 10px;border-radius:20px;"
+            f"font-size:12px;margin:3px;display:inline-block'>{s}</span>"
+            for s in ph["skills"]
+        )
+        st.markdown(
+            f"""
+            <div style='background:{ph['color_bg']};border-left:4px solid {ph['color_border']};
+                 border-radius:10px;padding:18px 22px;margin-bottom:16px'>
+              <div style='display:flex;align-items:center;gap:10px;margin-bottom:8px'>
+                <span style='font-size:22px'>{ph['icon']}</span>
+                <div>
+                  <div style='color:#f1f5f9;font-weight:700;font-size:16px'>{ph['label']}</div>
+                  <div style='color:#94a3b8;font-size:13px'>{ph['subtitle']}</div>
+                </div>
+              </div>
+              <div style='margin-bottom:12px'><strong style='color:#e2e8f0'>Target Skills:</strong><br/>
+                <div style='margin-top:6px'>{skills_html}</div>
+              </div>
+              <div style='color:#cbd5e1;font-size:13px;margin-bottom:4px'>
+                🛠️ <strong>Milestone Project:</strong> {ph['milestone']}
+              </div>
+              <div style='color:#94a3b8;font-size:12px'>
+                🎓 Recommended Cert: {ph['cert']}
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
+
+    # ── Already-have skills summary
+    if have:
+        st.markdown("### ✅ Skills You Already Have (Head Start)")
+        have_html = "".join(
+            f"<span style='background:#14532d;border:1px solid #22c55e;color:#4ade80;"
+            f"padding:3px 12px;border-radius:20px;font-size:13px;margin:4px;display:inline-block'>✓ {s}</span>"
+            for s in have[:12]
+        )
+        st.markdown(
+            f"<div style='padding:8px 0'>{have_html}</div>",
+            unsafe_allow_html=True,
+        )
+        st.success(f"You already have **{len(have)}** of the required skills — you're ahead of most fresh starters!")
+
+    # ── Market signal
+    st.divider()
+    st.markdown("### 📈 Why This Role, Why Now")
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        li_count = role.get("li_posting_count") or 0
+        st.metric("Live Job Postings", f"{li_count:,}", help="LinkedIn postings in dataset")
+    with col_b:
+        li_co = role.get("li_unique_companies") or 0
+        st.metric("Unique Companies Hiring", f"{li_co:,}")
+    with col_c:
+        frontier_ratio = role.get("li_frontier_skill_ratio") or 0.0
+        st.metric("Frontier Skill Ratio", f"{frontier_ratio*100:.1f}%",
+                  help="% of skills in this role that are cutting-edge")
+
+    st.caption(
+        "📊 Market data sourced from LinkedIn, Adzuna, Naukri, O*NET & ESCO — "
+        "processed by the LightGBM Pipeline A demand forecaster."
+    )
+
+    if st.button("📋 View Full Skill Gap & Roadmap →", type="primary"):
+        st.session_state["selected_role_id"] = selected_role_name
+        st.session_state["current_page"] = "Role Details"
+        st.rerun()
+
+
+# ── Page 11: AI Disruption Shockwave & Stress-Tester ──────────────────────────
+
+def render_ai_shockwave_page():
+    st.markdown("## ⚡ AI Disruption Shockwave & Skill Half-Life Stress-Tester")
+    st.markdown(
+        "##### *Empirically stress-test your technical career resilience against autonomous agent breakout and generative AI displacement.*"
+    )
+    st.caption(
+        "Traditional career guidance assumes static job markets. Our stress-testing engine simulates "
+        "large-scale capability leaps (e.g. autonomous coding agents, prompt-to-app compilers) to calculate your "
+        "**Skillset Half-Life** and **Career Antifragility Index**."
+    )
+    st.divider()
+
+    # User skills setup
+    declared = st.session_state.get("declared_skills", []) or ["Python", "SQL", "Git"]
+
+    col_ctrl1, col_ctrl2 = st.columns([3, 2])
+    with col_ctrl1:
+        scenario_options = {
+            "agentic_breakout": "🟡 Scenario 2: Agentic SWE Breakout (Moderate Shock)",
+            "baseline": "🟢 Scenario 1: Steady Tech Evolution (Conservative)",
+            "autonomous_enterprise": "🔴 Scenario 3: Autonomous Enterprise & AGI Frontier (Black Swan)",
+        }
+        chosen_key = st.selectbox(
+            "Select AI Disruption Shock Scenario",
+            options=list(scenario_options.keys()),
+            format_func=lambda k: scenario_options[k],
+            index=0,
+            help="Simulates different market adoption speeds and task automation depths.",
+        )
+        scenario_meta = SCENARIOS[chosen_key]
+        st.info(f"**Scenario Context:** {scenario_meta['headline']}\n\n*{scenario_meta['description']}*")
+
+    with col_ctrl2:
+        shock_slider = st.slider(
+            "Shock Intensity Multiplier",
+            min_value=0.5,
+            max_value=2.0,
+            value=1.0,
+            step=0.1,
+            help="Scale the velocity and market penetration of the AI shock.",
+        )
+        active_skills = st.multiselect(
+            "Active Skill Portfolio Being Stress-Tested",
+            options=COMMON_SKILLS_LIST,
+            default=declared,
+            help="Add or remove skills to see real-time changes in your half-life and antifragility.",
+        )
+        if not active_skills:
+            active_skills = ["Python", "SQL", "Git"]
+
+    tester = AIStressTester(scenario_key=chosen_key, shock_intensity=shock_slider)
+    eval_res = tester.evaluate_skills(active_skills)
+
+    st.divider()
+
+    # ── Executive Metric KPI Cards
+    col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+    with col_kpi1:
+        st.metric(
+            label="🛡️ Career Antifragility",
+            value=f"{eval_res['antifragility_score']:.0f} / 100",
+            help="Resistance to automated displacement (Weighted across skills & archetype agility)",
+        )
+        st.markdown(
+            f"<div style='font-size:12px;color:{eval_res['tier_color']};font-weight:600'>{eval_res['tier_label']}</div>",
+            unsafe_allow_html=True,
+        )
+
+    with col_kpi2:
+        hl = eval_res["portfolio_half_life_months"]
+        st.metric(
+            label="⏳ Skillset Half-Life",
+            value=f"{hl:.1f} Months",
+            delta=f"{-1.5 * shock_slider:.1f} mo under shock",
+            delta_color="inverse",
+            help="Projected time before >50% of your current skillset execution is commoditized without upskilling.",
+        )
+        st.caption("Time-to-commoditization")
+
+    with col_kpi3:
+        cats = eval_res["category_breakdown"]
+        tot = len(eval_res["skills"])
+        st.metric(
+            label="🟢 Antifragile Moat",
+            value=f"{cats['antifragile']} / {tot}",
+            delta=f"{eval_res['antifragile_ratio_pct']:.0f}% of portfolio",
+            help="Skills whose market demand increases as AI adoption grows (e.g. System Architecture, RAG, Cybersecurity).",
+        )
+        st.caption("Surging demand with AI")
+
+    with col_kpi4:
+        st.metric(
+            label="🔴 High Automation Risk",
+            value=f"{cats['high_vulnerability']} / {tot}",
+            delta=f"{eval_res['vulnerability_ratio_pct']:.0f}% exposed",
+            delta_color="inverse",
+            help="Skills heavily subject to direct agent synthesis (e.g. routine boilerplate, HTML/CSS, basic scripts).",
+        )
+        st.caption("Automated by coding agents")
+
+    st.markdown(
+        f"""
+        <div style="background:#1e1e38;border-left:4px solid {eval_res['tier_color']};padding:12px 16px;border-radius:6px;margin:12px 0 20px 0;">
+            <div style="color:#e2e8f0;font-size:14px;"><strong>Diagnosis:</strong> {eval_res['tier_summary']}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ── Interactive Plotly Chart of Skill Half-Life
+    st.markdown("### 📊 Skill Portfolio Exposure & Depreciation Timeline")
+    render_skill_halflife_chart(eval_res["skills"])
+
+    with st.expander("🔍 View Detailed Skill Displacement Risk Table", expanded=False):
+        skills_df = pd.DataFrame(eval_res["skills"])[
+            ["skill", "category_label", "base_risk", "shock_risk", "half_life_months", "moat", "description"]
+        ].rename(
+            columns={
+                "skill": "Skill",
+                "category_label": "Exposure Classification",
+                "base_risk": "Base Risk (%)",
+                "shock_risk": "Post-Shock Risk (%)",
+                "half_life_months": "Half-Life (Mo)",
+                "moat": "Defense Moat",
+                "description": "Automation Driver",
+            }
+        )
+        st.dataframe(skills_df, use_container_width=True, hide_index=True)
+
+    # ── Role Re-Ranking Under Shock
+    st.divider()
+    st.markdown("### ⚡ Market Role Fit: Baseline vs Post-Shock Displacement")
+    st.caption("How your career match ranking changes when enterprise hiring absorbs this AI shockwave.")
+
+    # Get roles to stress-test
+    recs = st.session_state.get("top_recommendations") or []
+    if not recs:
+        # Load catalog top roles if no assessment was done yet
+        catalog = load_role_catalog()
+        for idx, role in enumerate(catalog[:5]):
+            recs.append({
+                "role_id": role.get("role_id"),
+                "role_name": role.get("role_name"),
+                "final_score": 0.82 - (idx * 0.05),
+                "role_entry": role,
+            })
+
+    stressed_roles = tester.stress_test_roles(recs, active_skills)
+    render_shock_comparison_chart(stressed_roles)
+
+    # Table of rank changes
+    rerank_rows = []
+    for r in stressed_roles:
+        rerank_rows.append({
+            "Role": r["role_name"],
+            "Pre-Shock Rank": f"#{r['original_rank']}",
+            "Post-Shock Rank": f"#{r['post_shock_rank']}",
+            "Score Before": f"{r['original_score']}%",
+            "Score After": f"{r['shocked_score']}%",
+            "Momentum": r["momentum"],
+            "Frontier Skill Ratio": f"{r['frontier_ratio_pct']}%",
+        })
+    st.dataframe(pd.DataFrame(rerank_rows), use_container_width=True, hide_index=True)
+
+    # ── Antifragility Vaccine (Actionable Prescription)
+    st.divider()
+    st.markdown("### 💊 Antifragility Vaccine: Optimal Upskilling Prescription")
+    st.markdown(
+        "Our optimization engine calculated the **top 3 highest-leverage skills** to acquire right now. "
+        "These skills provide the maximal boost to your Antifragility Score and extend your Skillset Half-Life."
+    )
+
+    vaccines = tester.prescribe_antifragility_vaccine(active_skills)
+    col_v1, col_v2, col_v3 = st.columns(3)
+    vaccine_cols = [col_v1, col_v2, col_v3]
+
+    for idx, v in enumerate(vaccines):
+        with vaccine_cols[idx]:
+            with st.container(border=True):
+                st.markdown(f"#### 🎯 #{idx+1} {v['skill']}")
+                st.markdown(f"**Score Boost:** `+{v['score_boost']:.1f} pts` → `{v['new_antifragility']:.0f}/100`")
+                st.markdown(f"**Half-Life Extension:** `+{v['half_life_extension_months']:.1f} months`")
+                st.markdown(f"**Defense Moat:** `{v['moat']}`")
+                st.caption(f"💡 {v['description']}")
+
+    st.info(
+        "💡 **Key Insight for Presentation:** "
+        "Adding even one high-leverage architectural or frontier skill (such as System Architecture or RAG) "
+        "inoculates your career portfolio against LLM code automation by shifting your role from an *execution unit* "
+        "to a *systems director*."
+    )
+
+
+# ── Main Application Router ───────────────────────────────────────────────────────
 
 def main():
     st.set_page_config(
@@ -947,6 +1373,8 @@ def main():
             "Compare Roles",
             "Emerging Explorer",
             "Assessment History",
+            "Career Timeline",
+            "AI Shockwave Stress-Test",
         ]
         curr_idx = pages.index(st.session_state["current_page"]) if st.session_state["current_page"] in pages else 0
         selected = st.radio("Go to:", pages, index=curr_idx)
@@ -979,7 +1407,12 @@ def main():
         render_explorer_page()
     elif page == "Assessment History":
         render_assessment_history_page()
+    elif page == "Career Timeline":
+        render_career_timeline_page()
+    elif page == "AI Shockwave Stress-Test":
+        render_ai_shockwave_page()
 
 
 if __name__ == "__main__":
     main()
+
