@@ -58,11 +58,11 @@ const AppShell: React.FC<{ children: React.ReactNode; title?: string }> = ({ chi
 };
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
-export const App: React.FC = () => {
+export const App: React.FC<{ basename?: string }> = ({ basename }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <UserProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={basename}>
           <Routes>
             {/* Default → My Matches */}
             <Route path="/" element={<Navigate to="/matches" replace />} />

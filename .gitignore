@@ -65,3 +65,6 @@ data.zip
 # Frontend dependencies & build outputs
 frontend/node_modules/
 frontend/dist/
+
+# Sites Worker build output
+/dist/
