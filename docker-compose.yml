@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: node:20-slim
+    image: node:22-slim
     container_name: talentalign-frontend
     working_dir: /app/frontend
     ports:

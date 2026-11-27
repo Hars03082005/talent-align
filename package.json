@@ -1,0 +1,9 @@
+{
+  "name": "talentalign-sites",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev -- --host 0.0.0.0 --mode site",
+    "build": "npm --prefix frontend ci --no-audit --no-fund && npm --prefix frontend run build -- --mode site && node scripts/build_sites_worker.mjs"
+  }
+}

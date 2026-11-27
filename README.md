@@ -224,3 +224,37 @@ talent-align/
 | **Backend & DB** | FastAPI 0.136.3, Uvicorn 0.49.0, Pydantic 2.12.5, SQLAlchemy + SQLite, APScheduler |
 | **Frontend** | React 18, TypeScript 5.4, Vite 5.1, Tailwind CSS 3.4, Recharts, TanStack React Query |
 | **Testing & DevOps** | pytest 8.4.2, httpx, Docker & Docker Compose |
+
+## Candidate workspace deployment
+
+The React workspace opens at /jobs. Its employer-board feed refreshes on access
+or on demand and falls back to a timestamped snapshot during outages. The Site
+bundles the role catalog and policy exported by the original Python loaders.
+Its 20-question assessment uses the original 48-item bank and the Python
+engine’s generated selection tables. The browser applies the same weighted
+BAIO scores, work-style keyword mappings, and role scoring policy.
+Text-based resume PDFs are parsed in the browser. Candidates review and choose
+which extracted name, education, stated experience, and skills to import.
+Profile setup collects education, relevant experience, and work preferences.
+Role matches include an explainable score and the project's Gartner maturity
+mapping. Career roadmaps reuse the original stage definitions and project
+suggestions. Completed assessments reopen on the results screen. A retake
+updates the saved result only after the last question. The hosted Worker syncs
+new assessment results to the signed-in account through D1 and keeps a browser
+copy. Visitors without an account session keep their result in the browser.
+Candidate profiles, saved jobs, and roadmap progress are stored in the browser.
+
+For local development, install the frontend dependencies with
+npm --prefix frontend ci, then run npm --prefix frontend run dev.
+The original FastAPI, SQLite, and grounded Copilot workflows are available
+through the local React workspace under /legacy when FastAPI is running.
+The hosted build serves employer-board data on a Worker and does
+not run Python model retraining, Ollama, or the SQLite/MCP services. The
+historical forecasts and maturity layer are read from the project’s artifacts.
+
+To regenerate the portable role catalog from project data, run
+python -m scripts.export_workspace_catalog with the Python dependencies
+installed. The Node worker/capture.ts entry in the frontend can be bundled
+with esbuild to capture a new employer-board snapshot. Run npm run build at
+the repository root to produce the hosted Worker, and run
+node scripts/validate_sites_worker.mjs to smoke-test its routes and data handling.
